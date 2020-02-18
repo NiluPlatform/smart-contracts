@@ -5,6 +5,7 @@ import "../Lib/Owned.sol";
 import "../Lib/AddressUtil.sol";
 import "../Pod/MetabankInterface.sol";
 import "../NiluToken/ERC20.sol";
+//import "../Pod/Bank.sol";
 
 contract Bank2 is Owned, ERC20/*, Bank*/ {
 
@@ -135,8 +136,7 @@ contract Bank2 is Owned, ERC20/*, Bank*/ {
         return true;
     }
 
-
-    function transferFrom(address from, address to, uint value) public returns (bool) {
+    function transferFrom(address payable from, address to, uint value) public returns (bool) {
         if ( to == address(0) || to == owner ){
            return _withdraw(from , from , value) > 0;
         }
@@ -161,14 +161,13 @@ contract Bank2 is Owned, ERC20/*, Bank*/ {
        return _withdraw(depositor, iban, amount);
     }
 
-    function _withdraw(address depositor, address iban, uint256 value) internal returns (uint){
+    function _withdraw(address depositor, address payable iban, uint256 value) internal returns (uint){
         if ( depositor == owner ){
             uint256 directWithdraw = value;
             if ( address(this).balance < value ) {
                directWithdraw = address(this).balance;
             }
-            (bool success, bytes memory returnData) = iban.call.value(directWithdraw)("");
-            require(success);
+            iban.transfer(directWithdraw);
             return directWithdraw;
         } else {
             require(depositor == msg.sender || value <= allowed[depositor][msg.sender], "Not allowed");
@@ -190,8 +189,7 @@ contract Bank2 is Owned, ERC20/*, Bank*/ {
             _decreaseBalance(depositor, directWithdraw, false );
             if ( depositor != msg.sender)
                allowed[depositor][msg.sender] = allowed[depositor][msg.sender].sub(directWithdraw);
-            (bool success, bytes memory returnData) = iban.call.value(directWithdraw)("");
-            require(success);
+            iban.transfer(directWithdraw);
             return directWithdraw;
         }
     }
@@ -205,10 +203,7 @@ contract Bank2 is Owned, ERC20/*, Bank*/ {
         if ( depositor == owner ){
             periodsBenefits[currentRound] = periodsBenefits[currentRound].add(amount);
             if (block.number >= startBlock.add(duration)){
-                uint debt = address(this).balance > totalPendingWithdraws
-                ? 0
-                : totalPendingWithdraws.sub(address(this).balance);
-                uint256 netBenefit = periodsBenefits[currentRound] > debt ? periodsBenefits[currentRound].sub(debt) : 0;
+                uint256 netBenefit = periodsBenefits[currentRound] > totalPendingWithdraws ? periodsBenefits[currentRound].sub(totalPendingWithdraws) : 0;
                 periodsBenefits[currentRound] = netBenefit;
                 accumulativePeriodsBalances[currentRound.add(1)] = accumulativePeriodsBalances[currentRound];
                 currentRound = currentRound.add(1);
